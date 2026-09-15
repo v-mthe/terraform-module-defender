@@ -1,0 +1,17 @@
+environment                  = "dev"
+subscription_id              = "00000000-0000-0000-0000-000000000000"
+location                     = "eastus"
+resource_group_name          = "rg-dev-defender-security"
+log_analytics_workspace_name = "law-defender-dev-01"
+security_contact_email       = "security@example.com"
+security_contact_phone       = null
+
+# Set to false only when the deployment identity cannot create policy assignments.
+assign_security_benchmark = true
+
+tags = {
+  Workload   = "DefenderForCloud"
+  CostCenter = "CHANGE_ME"
+  Purpose    = "SecurityMonitoring"
+  Region     = "EastUS"
+}
