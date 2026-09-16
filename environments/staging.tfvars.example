@@ -4,6 +4,7 @@ adopt_existing_resources     = false
 location                     = "eastus"
 resource_group_name          = "rg-staging-defender-security"
 log_analytics_workspace_name = "law-defender-staging-01"
+# existing_log_analytics_workspace_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-shared-monitoring/providers/Microsoft.OperationalInsights/workspaces/law-shared-01"
 security_contact_email       = "security@example.com"
 security_contact_phone       = null
 assign_security_benchmark    = true

@@ -31,3 +31,6 @@ jobs:
 
       - name: Validate configuration
         run: terraform validate
+
+      - name: Test workspace selection
+        run: terraform test

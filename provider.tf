@@ -22,4 +22,13 @@ provider "azurerm" {
   resource_provider_registrations = "none"
 }
 
+provider "azurerm" {
+  alias = "log_analytics"
+
+  features {}
+
+  subscription_id                 = local.log_analytics_subscription_id
+  resource_provider_registrations = "none"
+}
+
 provider "azapi" {}

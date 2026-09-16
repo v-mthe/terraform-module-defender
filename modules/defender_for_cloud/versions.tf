@@ -5,6 +5,9 @@ terraform {
     azurerm = {
       source  = "hashicorp/azurerm"
       version = ">= 4.21.0, < 5.0.0"
+      configuration_aliases = [
+        azurerm.log_analytics,
+      ]
     }
     azapi = {
       source  = "Azure/azapi"

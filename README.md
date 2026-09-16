@@ -21,7 +21,7 @@ The repository configures approved Defender plans, Microsoft Defender for Endpoi
 - Configures Microsoft Defender for Endpoint integration.
 - Selects Microsoft Defender Vulnerability Management for servers.
 - Enables agentless VM scanning.
-- Creates and associates a Log Analytics workspace.
+- Creates a Log Analytics workspace or uses an existing one, then associates it with Defender.
 - Installs the `Security` and `SecurityCenterFree` workspace solutions.
 - Exports medium/high alerts, secure scores, and secure score controls.
 - Configures a security contact.
@@ -54,7 +54,7 @@ The AzureRM provider version used by this repository does not accept `AI` as a p
 flowchart LR
     TF[Terraform root] --> MOD[Defender for Cloud module]
     TF --> RG[Security resource group]
-    TF --> LAW[Log Analytics workspace]
+    TF --> LAW[New or existing Log Analytics workspace]
     MOD --> PLANS[Defender pricing plans]
     MOD --> SETTINGS[MDE, MDVM, agentless scanning]
     MOD --> CONTACT[Security contact]
@@ -132,7 +132,7 @@ The deployment identity needs permission to:
 
 - Manage `Microsoft.Security/pricings` and Defender environment settings.
 - Create resource groups and apply all policy-required tags.
-- Create and configure Log Analytics workspaces.
+- Create and configure Log Analytics workspaces, or read the selected existing workspace.
 - Create Microsoft Operations Management solutions.
 - Create Defender continuous-export automation.
 - Read and update existing subscription-level Defender resources.
@@ -156,11 +156,21 @@ Update the tfvars file with:
 
 - The target subscription ID.
 - Azure region.
-- Resource group and globally unique Log Analytics workspace names.
+- Resource group and globally unique Log Analytics workspace name, or an existing workspace resource ID.
 - Security-team email and optional E.164 phone number.
 - Required organizational tags.
 - Whether the deployment identity can assign the security benchmark.
 - Whether Terraform must adopt an existing Defender configuration.
+
+### Use an Existing Log Analytics Workspace
+
+By default, Terraform creates the workspace named by `log_analytics_workspace_name`. To use an existing workspace instead, set its complete resource ID:
+
+```hcl
+existing_log_analytics_workspace_id = "/subscriptions/<workspace-subscription-id>/resourceGroups/<workspace-resource-group>/providers/Microsoft.OperationalInsights/workspaces/<workspace-name>"
+```
+
+The existing workspace can be in the protected subscription or a central monitoring subscription. The deployment identity must be able to read it and manage the `Security` and `SecurityCenterFree` solutions when `enable_workspace_solutions = true`. Set `enable_workspace_solutions = false` when a central platform team already manages those solutions. When an existing workspace ID is set, `log_analytics_workspace_name`, `log_analytics_sku`, and `log_retention_in_days` are not used to create or modify the workspace.
 
 Update the backend file with the approved state resource group, storage account, container, and environment-specific key.
 
@@ -345,7 +355,8 @@ Promote source code, not state files or saved plans. Generate a new plan in each
 | `environment` | `string` | Yes | `dev`, `staging`, or `prod` |
 | `adopt_existing_resources` | `bool` | No | Import existing Defender resources; default `false` |
 | `resource_group_name` | `string` | Yes | Resource group for monitoring resources |
-| `log_analytics_workspace_name` | `string` | Yes | Log Analytics workspace name |
+| `log_analytics_workspace_name` | `string` | Conditional | Workspace name to create when an existing workspace ID is not supplied |
+| `existing_log_analytics_workspace_id` | `string` | No | Existing workspace resource ID; suppresses workspace creation |
 | `security_contact_email` | `string` | Yes | Defender notification address |
 | `location` | `string` | No | Azure region; default `eastus` |
 | `security_contact_phone` | `string` | No | E.164 contact number |

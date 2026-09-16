@@ -9,7 +9,7 @@ variable "location" {
 }
 
 variable "resource_group_name" {
-  description = "Resource group containing the Log Analytics workspace."
+  description = "Resource group for Defender continuous export automation."
   type        = string
 }
 
@@ -20,6 +20,16 @@ variable "log_analytics_workspace_id" {
 
 variable "log_analytics_workspace_name" {
   description = "Name of the Log Analytics workspace used by Defender."
+  type        = string
+}
+
+variable "log_analytics_location" {
+  description = "Azure region of the Log Analytics workspace."
+  type        = string
+}
+
+variable "log_analytics_resource_group_name" {
+  description = "Resource group containing the Log Analytics workspace."
   type        = string
 }
 

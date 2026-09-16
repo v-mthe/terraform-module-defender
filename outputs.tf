@@ -5,7 +5,7 @@ output "defender_plan_ids" {
 
 output "log_analytics_workspace_id" {
   description = "Resource ID of the Defender Log Analytics workspace."
-  value       = azurerm_log_analytics_workspace.defender.id
+  value       = local.log_analytics_workspace_id
 }
 
 output "security_benchmark_assignment_id" {

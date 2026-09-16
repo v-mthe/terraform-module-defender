@@ -89,11 +89,12 @@ resource "azurerm_security_center_workspace" "defender" {
 }
 
 resource "azurerm_log_analytics_solution" "security" {
-  count = var.enable_workspace_solutions ? 1 : 0
+  count    = var.enable_workspace_solutions ? 1 : 0
+  provider = azurerm.log_analytics
 
   solution_name         = "Security"
-  location              = var.location
-  resource_group_name   = var.resource_group_name
+  location              = var.log_analytics_location
+  resource_group_name   = var.log_analytics_resource_group_name
   workspace_resource_id = var.log_analytics_workspace_id
   workspace_name        = var.log_analytics_workspace_name
 
@@ -104,11 +105,12 @@ resource "azurerm_log_analytics_solution" "security" {
 }
 
 resource "azurerm_log_analytics_solution" "security_center_free" {
-  count = var.enable_workspace_solutions ? 1 : 0
+  count    = var.enable_workspace_solutions ? 1 : 0
+  provider = azurerm.log_analytics
 
   solution_name         = "SecurityCenterFree"
-  location              = var.location
-  resource_group_name   = var.resource_group_name
+  location              = var.log_analytics_location
+  resource_group_name   = var.log_analytics_resource_group_name
   workspace_resource_id = var.log_analytics_workspace_id
   workspace_name        = var.log_analytics_workspace_name
 

@@ -31,8 +31,25 @@ variable "resource_group_name" {
 }
 
 variable "log_analytics_workspace_name" {
-  description = "Name of the Log Analytics workspace used by Defender for Cloud."
+  description = "Name of the Log Analytics workspace to create. Required when existing_log_analytics_workspace_id is null."
   type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "existing_log_analytics_workspace_id" {
+  description = "Optional resource ID of an existing Log Analytics workspace to use instead of creating one."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition = var.existing_log_analytics_workspace_id == null || can(regex(
+      "(?i)^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\\.OperationalInsights/workspaces/[^/]+$",
+      trimspace(var.existing_log_analytics_workspace_id)
+    ))
+    error_message = "existing_log_analytics_workspace_id must be a complete Log Analytics workspace resource ID."
+  }
 }
 
 variable "log_analytics_sku" {
