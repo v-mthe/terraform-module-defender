@@ -3,7 +3,9 @@
 subscription_id = "00000000-0000-0000-0000-000000000000"
 environment     = "dev" # Allowed: dev, staging, prod.
 
-# false = greenfield; true = adopt existing subscription-level Defender objects.
+# Import decision applies only to Defender pricing/settings, never to LAW.
+# false = configured Defender objects do not exist (greenfield).
+# true = adopt existing Defender objects (brownfield). An existing LAW is ignored.
 adopt_existing_resources = false
 
 security_contact_email = "security@example.com"

@@ -32,5 +32,5 @@ jobs:
       - name: Validate configuration
         run: terraform validate
 
-      - name: Test workspace selection
+      - name: Test subscription Defender configuration
         run: terraform test

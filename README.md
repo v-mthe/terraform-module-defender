@@ -22,11 +22,11 @@ The `Standard` plans are billable. Confirm the target subscription and cost appr
 
 ## Additional Configuration
 
-The root configures Defender only at subscription scope. It does not create or associate a Log Analytics workspace, install workspace solutions, or configure continuous export. It also configures the Microsoft Cloud Security Benchmark, Defender for Endpoint integration, Microsoft Defender Vulnerability Management, and a security contact.
+The root configures Defender only at subscription scope. It does not create, import, modify, or delete a Log Analytics workspace (LAW), install workspace solutions, associate Defender with a workspace, or configure continuous export. An existing LAW may remain in the subscription; this configuration simply does not use or manage it. The root also configures the Microsoft Cloud Security Benchmark, Defender for Endpoint integration, Microsoft Defender Vulnerability Management, and a security contact.
 
 Servers P1 does not support agentless VM scanning, so `enable_agentless_vm_scanning` must remain `false`. When downgrading an existing P2 subscription, disable its `AgentlessVmScanning` pricing extension before applying P1.
 
-Declarative imports are optional because customer subscriptions may be greenfield or brownfield. Keep `adopt_existing_resources = false` when the target Defender resources do not exist. Set it to `true` when Defender pricing, MDE, MDVM, or agentless scanner settings already exist and must be adopted into the selected environment's Terraform state. Terraform 1.7 or newer is required for these import blocks.
+Declarative imports are optional because customer subscriptions may be greenfield or brownfield. Keep `adopt_existing_resources = false` only when the configured Defender pricing and settings do not exist. Set it to `true` when Defender pricing, MDE, MDVM, or the optional agentless scanner setting already exists and must be adopted into the selected environment's Terraform state. Whether a LAW exists does not affect this setting: LAW resources are never imported by this configuration. Terraform 1.7 or newer is required for these import blocks.
 
 Azure can initialize `Microsoft.Security` resources even in subscriptions with no workloads. Run a plan with the greenfield default first. If Azure reports that a target resource already exists, enable `adopt_existing_resources`, generate a new saved plan, and review each import before applying.
 
@@ -34,9 +34,13 @@ Azure can initialize `Microsoft.Security` resources even in subscriptions with n
 |---|---:|---|
 | New subscription with no target Defender resources | `false` | No imports; Terraform creates and configures enabled resources |
 | Defender previously enabled manually, by policy, or by another deployment | `true` | Existing enabled plans and settings are imported into this environment's state |
+| A LAW exists, but configured Defender resources do not exist | `false` | The LAW is ignored; Defender resources are created without LAW integration |
+| A LAW and configured Defender resources both exist | `true` | Defender resources are imported; the LAW remains outside this configuration |
 | Unsure whether Azure initialized Defender resources | Start with `false` | Plan first; switch to `true` only if Azure reports existing target resources |
 
 Brownfield imports cover configured AzureRM pricing plans, Defender for AI and APIs pricing, the MDE `WDATP` setting, the MDVM `AzureServersSetting`, and the optional agentless VM scanner. Imports do not create duplicate resources; they establish Terraform state ownership for the existing Azure resource IDs. Use a new state key for each environment and never import the same Azure resource into multiple active Terraform states.
+
+When upgrading state created by an older LAW-enabled version, run `terraform state list` before planning. If that state owns a LAW or its resource group and they must be retained, back up the state and remove only those retained resource addresses from Terraform state before applying this version. The reviewed plan may delete the old Defender workspace association, Security solutions, and continuous export because those integrations are intentionally unsupported. Never approve deletion of a shared LAW or resource group.
 
 ## Environment Configuration
 

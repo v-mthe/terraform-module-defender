@@ -4,7 +4,7 @@
 
 This document defines the controlled process for deploying Microsoft Defender for Cloud through Terraform to the `dev`, `staging`, and `prod` environments.
 
-The configuration enables the Defender plans approved by the security team at subscription scope and adopts subscription-level Defender resources that Azure creates automatically. It does not create or associate a Log Analytics workspace.
+The configuration enables the Defender plans approved by the security team at subscription scope and can adopt existing subscription-level Defender resources. It does not create, import, modify, or delete a Log Analytics workspace (LAW), and it does not associate Defender with one.
 
 ## 2. Deployment Scope
 
@@ -83,8 +83,6 @@ Verify provider registration:
 ```powershell
 az provider show --namespace Microsoft.Security --query registrationState --output tsv
 az provider show --namespace Microsoft.PolicyInsights --query registrationState --output tsv
-az provider show --namespace Microsoft.OperationalInsights --query registrationState --output tsv
-az provider show --namespace Microsoft.OperationsManagement --query registrationState --output tsv
 ```
 
 Each result must be `Registered` before deployment.
@@ -119,9 +117,28 @@ Select the import mode in the environment tfvars before planning:
 |---|---|---|
 | Greenfield; target Defender resources do not exist | `adopt_existing_resources = false` | Import collections are empty |
 | Brownfield; Defender was enabled previously | `adopt_existing_resources = true` | Existing configured plans and singleton settings are adopted into this state |
+| A LAW exists | Depends only on Defender resource state | The LAW is not imported or managed |
 | State is unknown | Start with `false` | Plan first and switch to `true` only after an existing-resource response |
 
 Brownfield mode imports the configured AzureRM pricing plans, AI and API pricing, MDE, MDVM, and agentless VM scanning when enabled. An import changes Terraform state ownership; it does not recreate the Azure resource. Never manage the same Defender resource from multiple Terraform states.
+
+### Existing LAW or LAW-Enabled State
+
+The presence of a LAW does not make `adopt_existing_resources = true`; that flag applies only to the Defender resources listed above.
+
+- A LAW that is not in this Terraform state remains untouched.
+- A LAW previously referenced only as a data source remains untouched.
+- If an older version of this repository created a LAW or resource group and they must be retained, back up the state and detach only those retained addresses from state before applying this version.
+- The old Defender workspace association, Security solutions, and continuous export are intentionally not configured. Review their planned removal and confirm it matches the customer decision.
+
+Inspect the selected environment state before planning:
+
+```powershell
+terraform state pull > "$environment-state-backup.json"
+terraform state list | Select-String 'log_analytics|security_center_workspace|security_center_automation|azurerm_resource_group.defender'
+```
+
+Use `terraform state rm <address>` only for a LAW or resource group that is approved to remain in Azure but no longer be managed by this state. Do not remove the old integration addresses from state merely to hide their deletion; they must be removed from Azure when the customer requires no LAW integration. Never approve deletion of a shared LAW or resource group.
 
 Before downgrading an existing Servers P2 subscription to P1, disable the `AgentlessVmScanning` extension. Azure rejects P1 while this P2-only extension remains enabled.
 
@@ -186,14 +203,14 @@ az security pricing list --subscription '<target-subscription-id>' `
   --output table
 ```
 
-Verify the removed LAW integration is absent when migrating from an older deployment:
+When migrating from an older LAW-enabled deployment, verify that the Defender workspace association is absent:
 
 ```powershell
 az rest --method get `
   --url 'https://management.azure.com/subscriptions/<target-subscription-id>/providers/Microsoft.Security/workspaceSettings/default?api-version=2017-08-01-preview'
 ```
 
-An HTTP `404 ResourceNotFound` confirms no Defender workspace association remains.
+An HTTP `404 ResourceNotFound` confirms no Defender workspace association remains. It does not mean the LAW itself was deleted; a standalone or shared LAW may continue to exist outside this configuration.
 
 In the Azure portal:
 

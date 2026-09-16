@@ -2,8 +2,9 @@
 subscription_id = "<production-subscription-id>"
 environment     = "prod"
 
-# Greenfield default: no imports. Set true for an already-onboarded subscription
-# or after Azure reports that a configured Defender resource already exists.
+# Import decision applies only to Defender pricing/settings, never to LAW.
+# Keep false when configured Defender objects do not exist. Set true for an
+# already-onboarded subscription. An existing LAW is ignored either way.
 adopt_existing_resources = false
 
 security_contact_email = "<security-team-email>"
