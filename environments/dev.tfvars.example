@@ -1,5 +1,6 @@
 environment                  = "dev"
 subscription_id              = "00000000-0000-0000-0000-000000000000"
+adopt_existing_resources     = false
 location                     = "eastus"
 resource_group_name          = "rg-dev-defender-security"
 log_analytics_workspace_name = "law-defender-dev-01"

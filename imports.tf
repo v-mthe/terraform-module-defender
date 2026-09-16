@@ -1,11 +1,11 @@
 locals {
-  azurerm_defender_plan_imports = {
+  azurerm_defender_plan_imports = var.adopt_existing_resources ? {
     for name, plan in var.defender_plans : name => plan if name != "AI"
-  }
-  ai_plan_import = contains(keys(var.defender_plans), "AI") ? { AI = "AI" } : {}
-  mde_import     = var.enable_mde_integration ? { WDATP = "WDATP" } : {}
-  mdvm_import    = var.enable_mdvm ? { default = "AzureServersSetting" } : {}
-  vm_scanner_import = var.enable_agentless_vm_scanning ? {
+  } : {}
+  ai_plan_import = var.adopt_existing_resources && contains(keys(var.defender_plans), "AI") ? { AI = "AI" } : {}
+  mde_import     = var.adopt_existing_resources && var.enable_mde_integration ? { WDATP = "WDATP" } : {}
+  mdvm_import    = var.adopt_existing_resources && var.enable_mdvm ? { default = "AzureServersSetting" } : {}
+  vm_scanner_import = var.adopt_existing_resources && var.enable_agentless_vm_scanning ? {
     default = "default"
   } : {}
 }

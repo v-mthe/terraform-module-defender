@@ -26,7 +26,7 @@ The repository configures approved Defender plans, Microsoft Defender for Endpoi
 - Exports medium/high alerts, secure scores, and secure score controls.
 - Configures a security contact.
 - Optionally assigns the Microsoft Cloud Security Benchmark initiative.
-- Adopts Azure-created Defender settings through declarative Terraform imports.
+- Optionally adopts existing Defender settings through declarative Terraform imports.
 - Supports isolated state and tfvars for `dev`, `staging`, and `prod`.
 
 ## Defender Plans
@@ -160,6 +160,7 @@ Update the tfvars file with:
 - Security-team email and optional E.164 phone number.
 - Required organizational tags.
 - Whether the deployment identity can assign the security benchmark.
+- Whether Terraform must adopt an existing Defender configuration.
 
 Update the backend file with the approved state resource group, storage account, container, and environment-specific key.
 
@@ -219,7 +220,7 @@ terraform plan `
 terraform show -no-color "$environment.tfplan"
 ```
 
-Review the complete plan. First-time deployments normally show imports because Azure creates Defender pricing and settings when a subscription is onboarded.
+Review the complete plan. Brownfield deployments show imports when `adopt_existing_resources = true`.
 
 Do not approve a plan that unexpectedly destroys or replaces imported Defender resources.
 
@@ -231,7 +232,31 @@ terraform apply -input=false "$environment.tfplan"
 
 Apply only the reviewed saved plan. Require approval gates for staging and production.
 
-## Existing Defender Resources
+## Greenfield and Brownfield Deployments
+
+Set the adoption behavior in the selected environment tfvars:
+
+```hcl
+# Greenfield: Terraform is onboarding Defender for the first time.
+adopt_existing_resources = false
+```
+
+```hcl
+# Brownfield: Defender was enabled previously or subscription settings exist.
+adopt_existing_resources = true
+```
+
+Use `true` when the subscription already has Defender pricing, MDE, MDVM, AI pricing, or VM scanner resources that Terraform must manage. Use `false` only when the target resources do not exist.
+
+Check the subscription before choosing:
+
+```powershell
+az security pricing list --subscription '<target-subscription-id>' --output table
+```
+
+Azure can initialize some `Microsoft.Security` resources even in a subscription with no workloads. Therefore, "greenfield workload" does not always mean "no Defender control-plane resources." If the first plan or apply reports `resource already exists`, set `adopt_existing_resources = true`, generate a new plan, and review the imports.
+
+### Existing Defender Resources
 
 Azure normally creates these resources before Terraform manages them:
 
@@ -240,7 +265,7 @@ Azure normally creates these resources before Terraform manages them:
 - Microsoft Defender Vulnerability Management setting.
 - Agentless VM scanner setting.
 
-The root `imports.tf` adopts them into the selected environment's state. Existing plan extension blocks are preserved to prevent Terraform from removing portal-managed Defender capabilities.
+When `adopt_existing_resources = true`, the root `imports.tf` adopts them into the selected environment's state. Existing plan extension blocks are preserved to prevent Terraform from removing portal-managed Defender capabilities.
 
 Do not delete the import blocks to work around an `already exists` error. Instead, confirm that the resource ID and selected subscription are correct.
 
@@ -318,6 +343,7 @@ Promote source code, not state files or saved plans. Generate a new plan in each
 |---|---|---|---|
 | `subscription_id` | `string` | Yes | Subscription to configure |
 | `environment` | `string` | Yes | `dev`, `staging`, or `prod` |
+| `adopt_existing_resources` | `bool` | No | Import existing Defender resources; default `false` |
 | `resource_group_name` | `string` | Yes | Resource group for monitoring resources |
 | `log_analytics_workspace_name` | `string` | Yes | Log Analytics workspace name |
 | `security_contact_email` | `string` | Yes | Defender notification address |
@@ -354,7 +380,7 @@ The identity lacks `Microsoft.Authorization/policyAssignments/write`. Grant the 
 
 ### Defender resource already exists
 
-Confirm `imports.tf` is present, Terraform is version 1.7 or newer, and the selected subscription matches the tfvars file. Generate a new plan to execute declarative imports.
+Confirm the selected subscription is correct, set `adopt_existing_resources = true`, and generate a new plan. Terraform 1.7 or newer is required for the declarative imports.
 
 ### Plan proposes destruction or replacement
 

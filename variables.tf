@@ -13,6 +13,12 @@ variable "environment" {
   }
 }
 
+variable "adopt_existing_resources" {
+  description = "Adopt existing subscription-level Defender resources into Terraform state. Enable for brownfield or previously onboarded subscriptions."
+  type        = bool
+  default     = false
+}
+
 variable "location" {
   description = "Azure region for Defender monitoring resources."
   type        = string
