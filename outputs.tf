@@ -1,12 +1,7 @@
-# Root outputs expose the resources most commonly consumed by pipelines and other stacks.
+# Root outputs expose resources commonly consumed by pipelines and verification steps.
 output "defender_plan_ids" {
   description = "Resource IDs of the enabled Defender plans."
   value       = module.defender_for_cloud.defender_plan_ids
-}
-
-output "log_analytics_workspace_id" {
-  description = "Resource ID of the Defender Log Analytics workspace."
-  value       = local.log_analytics_workspace_id
 }
 
 output "security_benchmark_assignment_id" {

@@ -1,4 +1,4 @@
-# Provider and state requirements for the reusable root configuration.
+# Provider and state requirements for the Defender root configuration.
 terraform {
   required_version = ">= 1.7.0"
 
@@ -17,7 +17,7 @@ terraform {
   backend "azurerm" {}
 }
 
-# Default provider targets the subscription protected by Defender for Cloud.
+# The deployment subscription is selected explicitly through tfvars.
 provider "azurerm" {
   features {}
 
@@ -25,14 +25,5 @@ provider "azurerm" {
   resource_provider_registrations = "none"
 }
 
-# This alias can target a central monitoring subscription that owns an existing LAW.
-provider "azurerm" {
-  alias = "log_analytics"
-
-  features {}
-
-  subscription_id                 = local.log_analytics_subscription_id
-  resource_provider_registrations = "none"
-}
-
+# AzAPI manages Defender resources not supported by the pinned AzureRM provider.
 provider "azapi" {}

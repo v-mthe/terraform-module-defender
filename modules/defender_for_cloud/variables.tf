@@ -1,36 +1,6 @@
-# Inputs keep subscription security resources separate from LAW-owned resources.
+# Subscription scope input.
 variable "subscription_resource_id" {
   description = "Azure subscription resource ID to protect."
-  type        = string
-}
-
-variable "location" {
-  description = "Azure region for workspace solutions and continuous export."
-  type        = string
-}
-
-variable "resource_group_name" {
-  description = "Resource group for Defender continuous export automation."
-  type        = string
-}
-
-variable "log_analytics_workspace_id" {
-  description = "Resource ID of the Log Analytics workspace used by Defender."
-  type        = string
-}
-
-variable "log_analytics_workspace_name" {
-  description = "Name of the Log Analytics workspace used by Defender."
-  type        = string
-}
-
-variable "log_analytics_location" {
-  description = "Azure region of the Log Analytics workspace."
-  type        = string
-}
-
-variable "log_analytics_resource_group_name" {
-  description = "Resource group containing the Log Analytics workspace."
   type        = string
 }
 
@@ -52,7 +22,17 @@ variable "defender_plans" {
   type = map(object({
     tier    = optional(string, "Standard")
     subplan = optional(string)
+    extensions = optional(map(object({
+      enabled                         = bool
+      additional_extension_properties = optional(map(string), {})
+    })), {})
   }))
+}
+
+variable "adopt_existing_resources" {
+  description = "Use non-destructive updates for existing Defender pricing resources."
+  type        = bool
+  default     = false
 }
 
 # Optional Defender platform capabilities.
@@ -75,19 +55,12 @@ variable "enable_mdvm" {
 }
 
 variable "enable_agentless_vm_scanning" {
-  description = "Enable agentless VM scanning."
+  description = "Enable agentless VM scanning. Requires Defender for Servers P2."
   type        = bool
-  default     = true
-}
+  default     = false
 
-variable "enable_continuous_export" {
-  description = "Export Defender findings to Log Analytics."
-  type        = bool
-  default     = true
-}
-
-variable "enable_workspace_solutions" {
-  description = "Install Security workspace solutions."
-  type        = bool
-  default     = true
+  validation {
+    condition     = !var.enable_agentless_vm_scanning || try(var.defender_plans["VirtualMachines"].subplan, null) != "P1"
+    error_message = "Agentless VM scanning is a Defender for Servers P2 feature and must be disabled when VirtualMachines uses P1."
+  }
 }

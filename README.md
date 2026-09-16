@@ -1,432 +1,79 @@
-# Terraform Microsoft Defender for Cloud
+# Microsoft Defender for Cloud
 
-Reusable Terraform configuration for onboarding Azure subscriptions to Microsoft Defender for Cloud across development, staging, and production environments.
+This folder contains a reusable Terraform module and an environment-aware root configuration for the Defender plans selected in the security team's screenshots.
 
-The repository configures approved Defender plans, Microsoft Defender for Endpoint integration, vulnerability assessment, agentless VM scanning, Log Analytics integration, continuous export, and the Microsoft Cloud Security Benchmark.
+See [DEPLOYMENT-INSTRUCTION-SET.md](DEPLOYMENT-INSTRUCTION-SET.md) for the complete operational deployment, promotion, verification, troubleshooting, and rollback procedure.
 
-> [!IMPORTANT]
-> Defender `Standard` plans are billable. Review plan selection and estimated cost with your security and FinOps teams before deployment.
+## Test Scope
 
-## Capabilities
+| Portal plan | Terraform pricing name | Selection |
+|---|---|---|
+| Servers | `VirtualMachines` / P1 | On |
+| App Service | `AppServices` | On |
+| Databases | `SqlServers`, `SqlServerVirtualMachines`, `OpenSourceRelationalDatabases`, `CosmosDbs` | On (4/4) |
+| Storage | `StorageAccounts` / DefenderForStorageV2 | On, malware scanning and sensitive-data discovery enabled |
+| Containers | `Containers` | On, all plan extensions enabled |
+| AI Services | `AI` | On, all plan extensions enabled |
+| Key Vault | `KeyVaults` / PerKeyVault | On |
+| Resource Manager | `Arm` / PerSubscription | On |
+| APIs | `Api` / P1 | On |
 
-- Enables Microsoft Defender for Servers P2.
-- Enables Defender for App Service.
-- Enables all four database protection plans.
-- Enables Defender for Storage v2.
-- Enables Defender for Containers.
-- Enables Defender for AI Services.
-- Enables Defender for Key Vault.
-- Enables Defender for Resource Manager.
-- Keeps Defender for APIs disabled.
-- Configures Microsoft Defender for Endpoint integration.
-- Selects Microsoft Defender Vulnerability Management for servers.
-- Enables agentless VM scanning.
-- Creates a Log Analytics workspace or uses an existing one, then associates it with Defender.
-- Installs the `Security` and `SecurityCenterFree` workspace solutions.
-- Exports medium/high alerts, secure scores, and secure score controls.
-- Configures a security contact.
-- Optionally assigns the Microsoft Cloud Security Benchmark initiative.
-- Optionally adopts existing Defender settings through declarative Terraform imports.
-- Supports isolated state and tfvars for `dev`, `staging`, and `prod`.
+The `Standard` plans are billable. Confirm the target subscription and cost approval before applying.
 
-## Defender Plans
+## Additional Configuration
 
-| Portal plan | Pricing resource | Tier | Subplan |
-|---|---|---|---|
-| Servers | `VirtualMachines` | `Standard` | `P2` |
-| App Service | `AppServices` | `Standard` | Default |
-| SQL databases | `SqlServers` | `Standard` | Default |
-| SQL servers on machines | `SqlServerVirtualMachines` | `Standard` | Default |
-| Open-source relational databases | `OpenSourceRelationalDatabases` | `Standard` | Default |
-| Cosmos DB | `CosmosDbs` | `Standard` | Default |
-| Storage | `StorageAccounts` | `Standard` | `DefenderForStorageV2` |
-| Containers | `Containers` | `Standard` | Default |
-| AI Services | `AI` | `Standard` | Default |
-| Key Vault | `KeyVaults` | `Standard` | `PerKeyVault` |
-| Resource Manager | `Arm` | `Standard` | `PerSubscription` |
-| APIs | `Api` | Off | Not configured |
+The root configures Defender only at subscription scope. It does not create or associate a Log Analytics workspace, install workspace solutions, or configure continuous export. It also configures the Microsoft Cloud Security Benchmark, Defender for Endpoint integration, Microsoft Defender Vulnerability Management, and a security contact.
 
-The AzureRM provider version used by this repository does not accept `AI` as a pricing resource type. Defender for AI is therefore managed through `azapi_resource` using `Microsoft.Security/pricings@2024-01-01`.
+Servers P1 does not support agentless VM scanning, so `enable_agentless_vm_scanning` must remain `false`. When downgrading an existing P2 subscription, disable its `AgentlessVmScanning` pricing extension before applying P1.
 
-## Architecture
+Declarative imports are optional because customer subscriptions may be greenfield or brownfield. Keep `adopt_existing_resources = false` when the target Defender resources do not exist. Set it to `true` when Defender pricing, MDE, MDVM, or agentless scanner settings already exist and must be adopted into the selected environment's Terraform state. Terraform 1.7 or newer is required for these import blocks.
 
-```mermaid
-flowchart LR
-    TF[Terraform root] --> MOD[Defender for Cloud module]
-    TF --> RG[Security resource group]
-    TF --> LAW[New or existing Log Analytics workspace]
-    MOD --> PLANS[Defender pricing plans]
-    MOD --> SETTINGS[MDE, MDVM, agentless scanning]
-    MOD --> CONTACT[Security contact]
-    MOD --> MCSB[Cloud Security Benchmark]
-    MOD --> SOLUTIONS[Security workspace solutions]
-    MOD --> EXPORT[Continuous export]
-    LAW --> SOLUTIONS
-    LAW --> EXPORT
-```
+Azure can initialize `Microsoft.Security` resources even in subscriptions with no workloads. Run a plan with the greenfield default first. If Azure reports that a target resource already exists, enable `adopt_existing_resources`, generate a new saved plan, and review each import before applying.
 
-## Repository Layout
+| Scenario | `adopt_existing_resources` | Expected behavior |
+|---|---:|---|
+| New subscription with no target Defender resources | `false` | No imports; Terraform creates and configures enabled resources |
+| Defender previously enabled manually, by policy, or by another deployment | `true` | Existing enabled plans and settings are imported into this environment's state |
+| Unsure whether Azure initialized Defender resources | Start with `false` | Plan first; switch to `true` only if Azure reports existing target resources |
 
-```text
-.
-|-- main.tf                         # Root resources and module call
-|-- variables.tf                    # Root input variables and defaults
-|-- outputs.tf                      # Defender plan and workspace outputs
-|-- provider.tf                     # Terraform, AzureRM, AzAPI, and backend
-|-- imports.tf                      # Declarative imports for existing settings
-|-- modules/
-|   `-- defender_for_cloud/
-|       |-- main.tf
-|       |-- variables.tf
-|       |-- outputs.tf
-|       `-- versions.tf
-`-- environments/
-    |-- dev.tfvars.example
-    |-- staging.tfvars.example
-    |-- prod.tfvars.example
-    `-- backend/
-        |-- dev.backend.hcl.example
-        |-- staging.backend.hcl.example
-        `-- prod.backend.hcl.example
-```
+Brownfield imports cover configured AzureRM pricing plans, Defender for AI and APIs pricing, the MDE `WDATP` setting, the MDVM `AzureServersSetting`, and the optional agentless VM scanner. Imports do not create duplicate resources; they establish Terraform state ownership for the existing Azure resource IDs. Use a new state key for each environment and never import the same Azure resource into multiple active Terraform states.
 
-## Requirements
+## Environment Configuration
 
-| Component | Version or requirement |
-|---|---|
-| Terraform | `>= 1.7.0` |
-| AzureRM provider | `4.21.0` |
-| AzAPI provider | `~> 2.0` |
-| Azure CLI | Current supported version |
-| Azure subscription | Active and accessible by the deployment identity |
-| Remote state | Azure Storage account and blob container |
+Environment values are separated from the reusable Terraform code:
 
-Terraform 1.7 or newer is required because `imports.tf` uses `for_each` in declarative import blocks.
+- `environments/dev.tfvars`
+- `environments/staging.tfvars`
+- `environments/prod.tfvars`
 
-## Required Azure Providers
+Replace all angle-bracket placeholders before planning staging or production. Each environment must use a separate backend key to prevent state collisions. Copy the matching file from `environments/backend/*.backend.hcl.example`, remove the `.example` suffix, and enter the approved state storage details.
 
-Register these resource providers in every target subscription:
+## Deployment
+
+Select the Azure subscription that matches the tfvars file, initialize its backend, and pass the environment file to every plan or apply command. The example below uses `dev`; replace `dev` consistently with `staging` or `prod` when promoting.
 
 ```powershell
-$providers = @(
-  'Microsoft.Security',
-  'Microsoft.PolicyInsights',
-  'Microsoft.OperationalInsights',
-  'Microsoft.OperationsManagement'
-)
-
-foreach ($provider in $providers) {
-  az provider register --namespace $provider
-}
-
-az provider list `
-  --query "[?contains(['Microsoft.Security','Microsoft.PolicyInsights','Microsoft.OperationalInsights','Microsoft.OperationsManagement'], namespace)].{namespace:namespace,state:registrationState}" `
-  --output table
-```
-
-Wait until every provider reports `Registered`.
-
-## Deployment Permissions
-
-The deployment identity needs permission to:
-
-- Manage `Microsoft.Security/pricings` and Defender environment settings.
-- Create resource groups and apply all policy-required tags.
-- Create and configure Log Analytics workspaces, or read the selected existing workspace.
-- Create Microsoft Operations Management solutions.
-- Create Defender continuous-export automation.
-- Read and update existing subscription-level Defender resources.
-- Create policy assignments when `assign_security_benchmark = true`.
-- Read and write Terraform state in the Azure Storage backend.
-
-A typical deployment identity requires Contributor at subscription scope, Storage Blob Data Contributor on the state container, and permission to create policy assignments. Confirm the least-privilege role design with your Azure security team.
-
-## Configure an Environment
-
-Copy the example files for the environment being deployed:
-
-```powershell
-$environment = 'dev' # dev, staging, or prod
-
-Copy-Item "environments/$environment.tfvars.example" "environments/$environment.tfvars"
-Copy-Item "environments/backend/$environment.backend.hcl.example" "environments/backend/$environment.backend.hcl"
-```
-
-Update the tfvars file with:
-
-- The target subscription ID.
-- Azure region.
-- Resource group and globally unique Log Analytics workspace name, or an existing workspace resource ID.
-- Security-team email and optional E.164 phone number.
-- Required organizational tags.
-- Whether the deployment identity can assign the security benchmark.
-- Whether Terraform must adopt an existing Defender configuration.
-
-### Use an Existing Log Analytics Workspace
-
-By default, Terraform creates the workspace named by `log_analytics_workspace_name`. To use an existing workspace instead, set its complete resource ID:
-
-```hcl
-existing_log_analytics_workspace_id = "/subscriptions/<workspace-subscription-id>/resourceGroups/<workspace-resource-group>/providers/Microsoft.OperationalInsights/workspaces/<workspace-name>"
-```
-
-The existing workspace can be in the protected subscription or a central monitoring subscription. The deployment identity must be able to read it and manage the `Security` and `SecurityCenterFree` solutions when `enable_workspace_solutions = true`. Set `enable_workspace_solutions = false` when a central platform team already manages those solutions. When an existing workspace ID is set, `log_analytics_workspace_name`, `log_analytics_sku`, and `log_retention_in_days` are not used to create or modify the workspace.
-
-Update the backend file with the approved state resource group, storage account, container, and environment-specific key.
-
-Populated `*.tfvars` and `*.backend.hcl` files are ignored by Git. Example files remain safe to commit.
-
-## Remote State Isolation
-
-Every environment must have a separate state key:
-
-| Environment | Recommended state key |
-|---|---|
-| Development | `defender/dev.tfstate` |
-| Staging | `defender/staging.tfstate` |
-| Production | `defender/prod.tfstate` |
-
-Do not use one environment's backend with another environment's tfvars. Do not copy state between environments.
-
-## Deploy
-
-### 1. Select the target subscription
-
-```powershell
-$environment = 'dev'
-$tfvars = "environments/$environment.tfvars"
-$backend = "environments/backend/$environment.backend.hcl"
-
 az login
-az account set --subscription '<target-subscription-id>'
-az account show --query '{name:name,id:id,tenantId:tenantId,state:state}' --output table
-```
-
-Confirm the displayed subscription matches `subscription_id` in the selected tfvars file.
-
-### 2. Initialize Terraform
-
-```powershell
-terraform init -reconfigure -backend-config=$backend
-```
-
-Commit `.terraform.lock.hcl` so all environments use the same provider versions.
-
-### 3. Validate
-
-```powershell
+az account set --subscription '<subscription-id>'
+terraform init -reconfigure -backend-config='environments/backend/dev.backend.hcl'
 terraform fmt -check -recursive
 terraform validate
+terraform plan -var-file='environments/dev.tfvars' -out='dev.tfplan'
+terraform apply 'dev.tfplan'
 ```
 
-### 4. Plan
+Always review the saved plan and require the environment's approval gate before apply. Never apply a plan generated for a different environment or subscription.
+
+### Dev Lab State
+
+The dev lab was applied successfully using local state at `.terraform/environment-test.tfstate`. After creating `environments/backend/dev.backend.hcl`, migrate that state once with the following command. Do not use `-reconfigure` for this first dev backend initialization because that would leave the deployed resources outside the remote state.
 
 ```powershell
-terraform plan `
-  -input=false `
-  -var-file=$tfvars `
-  -out="$environment.tfplan"
-
-terraform show -no-color "$environment.tfplan"
+terraform init -migrate-state -backend-config='environments/backend/dev.backend.hcl'
 ```
 
-Review the complete plan. Brownfield deployments show imports when `adopt_existing_resources = true`.
+The lab identity cannot create subscription policy assignments, so `dev.tfvars` disables the Microsoft Cloud Security Benchmark assignment. Staging and production retain the secure default and require `Microsoft.Authorization/policyAssignments/write`.
 
-Do not approve a plan that unexpectedly destroys or replaces imported Defender resources.
+The deployment identity needs permissions for subscription pricing and settings plus policy assignments when enabled. Register `Microsoft.Security` and `Microsoft.PolicyInsights` in the target subscription before deployment.
 
-### 5. Apply
-
-```powershell
-terraform apply -input=false "$environment.tfplan"
-```
-
-Apply only the reviewed saved plan. Require approval gates for staging and production.
-
-## Greenfield and Brownfield Deployments
-
-Set the adoption behavior in the selected environment tfvars:
-
-```hcl
-# Greenfield: Terraform is onboarding Defender for the first time.
-adopt_existing_resources = false
-```
-
-```hcl
-# Brownfield: Defender was enabled previously or subscription settings exist.
-adopt_existing_resources = true
-```
-
-Use `true` when the subscription already has Defender pricing, MDE, MDVM, AI pricing, or VM scanner resources that Terraform must manage. Use `false` only when the target resources do not exist.
-
-Check the subscription before choosing:
-
-```powershell
-az security pricing list --subscription '<target-subscription-id>' --output table
-```
-
-Azure can initialize some `Microsoft.Security` resources even in a subscription with no workloads. Therefore, "greenfield workload" does not always mean "no Defender control-plane resources." If the first plan or apply reports `resource already exists`, set `adopt_existing_resources = true`, generate a new plan, and review the imports.
-
-### Existing Defender Resources
-
-Azure normally creates these resources before Terraform manages them:
-
-- Defender pricing resources.
-- Microsoft Defender for Endpoint setting.
-- Microsoft Defender Vulnerability Management setting.
-- Agentless VM scanner setting.
-
-When `adopt_existing_resources = true`, the root `imports.tf` adopts them into the selected environment's state. Existing plan extension blocks are preserved to prevent Terraform from removing portal-managed Defender capabilities.
-
-Do not delete the import blocks to work around an `already exists` error. Instead, confirm that the resource ID and selected subscription are correct.
-
-## Post-Deployment Verification
-
-### Terraform convergence
-
-```powershell
-terraform plan `
-  -input=false `
-  -detailed-exitcode `
-  -var-file=$tfvars
-```
-
-Terraform exit codes:
-
-- `0`: no changes; infrastructure matches configuration.
-- `1`: error.
-- `2`: changes detected.
-
-### Defender pricing
-
-```powershell
-az security pricing list `
-  --subscription '<target-subscription-id>' `
-  --query "value[?name=='VirtualMachines' || name=='AppServices' || name=='SqlServers' || name=='SqlServerVirtualMachines' || name=='OpenSourceRelationalDatabases' || name=='CosmosDbs' || name=='StorageAccounts' || name=='Containers' || name=='AI' || name=='KeyVaults' || name=='Arm'].{plan:name,tier:pricingTier,subPlan:subPlan}" `
-  --output table
-```
-
-All listed plans must report `Standard` with the expected subplans.
-
-### Resource group and workspace
-
-```powershell
-az group show `
-  --name '<resource-group-name>' `
-  --subscription '<target-subscription-id>' `
-  --query '{name:name,location:location,state:properties.provisioningState,tags:tags}' `
-  --output json
-
-az monitor log-analytics workspace show `
-  --resource-group '<resource-group-name>' `
-  --workspace-name '<workspace-name>' `
-  --subscription '<target-subscription-id>' `
-  --query '{name:name,location:location,state:provisioningState,retention:retentionInDays}' `
-  --output json
-```
-
-Both resources must report `Succeeded`.
-
-### Azure portal
-
-1. Open **Microsoft Defender for Cloud**.
-2. Select **Environment settings**.
-3. Select the target subscription.
-4. Confirm the plan selection and subplans.
-5. Confirm Defender for APIs remains Off.
-6. Confirm continuous export targets the correct Log Analytics workspace.
-7. Confirm the security contact and notification settings.
-8. Review coverage and recommendations after onboarding completes.
-
-## Environment Promotion
-
-Promote the same reviewed Terraform version in this order:
-
-1. Deploy and verify development.
-2. Plan, approve, deploy, and verify staging.
-3. Plan, approve, deploy, and verify production.
-
-Promote source code, not state files or saved plans. Generate a new plan in each environment using its own credentials, tfvars, and backend.
-
-## Input Reference
-
-| Variable | Type | Required | Description |
-|---|---|---|---|
-| `subscription_id` | `string` | Yes | Subscription to configure |
-| `environment` | `string` | Yes | `dev`, `staging`, or `prod` |
-| `adopt_existing_resources` | `bool` | No | Import existing Defender resources; default `false` |
-| `resource_group_name` | `string` | Yes | Resource group for monitoring resources |
-| `log_analytics_workspace_name` | `string` | Conditional | Workspace name to create when an existing workspace ID is not supplied |
-| `existing_log_analytics_workspace_id` | `string` | No | Existing workspace resource ID; suppresses workspace creation |
-| `security_contact_email` | `string` | Yes | Defender notification address |
-| `location` | `string` | No | Azure region; default `eastus` |
-| `security_contact_phone` | `string` | No | E.164 contact number |
-| `log_analytics_sku` | `string` | No | Default `PerGB2018` |
-| `log_retention_in_days` | `number` | No | Default `90` |
-| `defender_plans` | `map(object)` | No | Defender plan selection |
-| `assign_security_benchmark` | `bool` | No | Assign MCSB; default `true` |
-| `enable_mde_integration` | `bool` | No | Enable MDE; default `true` |
-| `enable_mdvm` | `bool` | No | Select MDVM; default `true` |
-| `enable_agentless_vm_scanning` | `bool` | No | Enable scanning; default `true` |
-| `enable_continuous_export` | `bool` | No | Enable exports; default `true` |
-| `enable_workspace_solutions` | `bool` | No | Install solutions; default `true` |
-| `tags` | `map(string)` | No | Organizational tags |
-
-## Outputs
-
-| Output | Description |
-|---|---|
-| `defender_plan_ids` | IDs of managed Defender pricing resources |
-| `log_analytics_workspace_id` | ID of the Defender Log Analytics workspace |
-| `security_benchmark_assignment_id` | MCSB assignment ID when enabled |
-
-## Troubleshooting
-
-### Resource group denied by policy
-
-Read the Azure policy error and add every required tag to the environment's `tags` map. Resource-group tag policies are evaluated during creation.
-
-### Policy assignment returns 403
-
-The identity lacks `Microsoft.Authorization/policyAssignments/write`. Grant the required permission or set `assign_security_benchmark = false` only with security-team approval.
-
-### Defender resource already exists
-
-Confirm the selected subscription is correct, set `adopt_existing_resources = true`, and generate a new plan. Terraform 1.7 or newer is required for the declarative imports.
-
-### Plan proposes destruction or replacement
-
-Stop. Confirm current Azure subplans and plan extensions. Do not replace imported Defender pricing resources without security approval.
-
-### Backend initialization fails
-
-Confirm the backend file, storage account firewall, container, and Storage Blob Data Contributor assignment. Use `-migrate-state` when moving existing state and `-reconfigure` when selecting a backend without migration.
-
-## Rollback and Removal
-
-Do not use `terraform destroy` as the default Defender rollback. Destroying imported subscription-level settings can disable protection or cause unsupported replacement behavior.
-
-Use a controlled corrective deployment:
-
-1. Preserve state and plan output.
-2. Obtain security and FinOps approval.
-3. Change the affected plan tier or feature flag explicitly.
-4. Generate and review a new plan.
-5. Apply the approved corrective plan.
-
-Removing continuous export or the Log Analytics workspace can affect security-data retention. Confirm retention and export requirements before removal.
-
-## Security Considerations
-
-- Never commit populated tfvars, backend credentials, Terraform state, or saved plans.
-- Use workload identity federation or managed identity for CI/CD where available.
-- Restrict state-container access because Terraform state can contain sensitive values.
-- Require protected branches and environment approvals for production.
-- Review Defender pricing before enabling new plans or extensions.
-- Rotate security-contact details through controlled configuration changes.
-
-## References
-
-- [Deploy Microsoft Defender for Cloud via Terraform](https://techcommunity.microsoft.com/blog/microsoftdefendercloudblog/deploy-microsoft-defender-for-cloud-via-terraform/3563710)
-- [Microsoft Defender for Cloud documentation](https://learn.microsoft.com/azure/defender-for-cloud/)
-- [Terraform AzureRM provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
-- [Terraform AzAPI provider](https://registry.terraform.io/providers/Azure/azapi/latest/docs)
+Reference: [Deploy Microsoft Defender for Cloud via Terraform](https://techcommunity.microsoft.com/blog/microsoftdefendercloudblog/deploy-microsoft-defender-for-cloud-via-terraform/3563710)

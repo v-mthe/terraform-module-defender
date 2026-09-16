@@ -3,7 +3,8 @@ output "defender_plan_ids" {
   description = "Resource IDs of the enabled Defender plans."
   value = merge(
     { for name, plan in azurerm_security_center_subscription_pricing.plan : name => plan.id },
-    try({ AI = azapi_resource.ai_plan[0].id }, {})
+    try({ AI = azapi_resource.ai_plan[0].id }, {}),
+    try({ Api = azapi_resource.api_plan[0].id }, {})
   )
 }
 

@@ -1,7 +1,13 @@
 # AzureRM manages every approved pricing resource except Defender for AI.
 locals {
   azurerm_defender_plans = {
-    for name, plan in var.defender_plans : name => plan if name != "AI"
+    for name, plan in var.defender_plans : name => plan if !contains(["AI", "Api"], name)
+  }
+  brownfield_subplans = var.adopt_existing_resources ? {
+    for name, plan in local.azurerm_defender_plans : name => plan if plan.subplan != null
+  } : {}
+  plan_extensions = {
+    for name, plan in var.defender_plans : name => plan if length(plan.extensions) > 0
   }
 }
 
@@ -20,12 +26,30 @@ resource "azurerm_security_center_subscription_pricing" "plan" {
 
   tier          = each.value.tier
   resource_type = each.key
-  subplan       = each.value.subplan
+  subplan       = var.adopt_existing_resources ? null : each.value.subplan
 
   # Preserve provider/portal-created extensions such as agentless discovery settings.
   lifecycle {
-    ignore_changes = [extension]
+    ignore_changes = [extension, subplan]
   }
+}
+
+# AzureRM marks adding a subplan to an existing Free pricing singleton as a
+# replacement. Patch brownfield subplans through ARM to avoid delete/recreate.
+resource "azapi_update_resource" "brownfield_subplan" {
+  for_each = local.brownfield_subplans
+
+  type      = "Microsoft.Security/pricings@2024-01-01"
+  name      = each.key
+  parent_id = var.subscription_resource_id
+  body = {
+    properties = {
+      pricingTier = each.value.tier
+      subPlan     = each.value.subplan
+    }
+  }
+
+  depends_on = [azurerm_security_center_subscription_pricing.plan]
 }
 
 # AzureRM 4.21 does not accept AI as a pricing resource type, so AzAPI manages it.
@@ -38,8 +62,62 @@ resource "azapi_resource" "ai_plan" {
   body = {
     properties = {
       pricingTier = var.defender_plans["AI"].tier
+      extensions = [
+        for name, extension in var.defender_plans["AI"].extensions : {
+          name                          = name
+          isEnabled                     = title(tostring(extension.enabled))
+          additionalExtensionProperties = extension.additional_extension_properties
+        }
+      ]
     }
   }
+}
+
+# AzureRM 4.21 does not accept Api as a pricing resource type.
+resource "azapi_resource" "api_plan" {
+  count = contains(keys(var.defender_plans), "Api") ? 1 : 0
+
+  type      = "Microsoft.Security/pricings@2024-01-01"
+  name      = "Api"
+  parent_id = var.subscription_resource_id
+  body = {
+    properties = {
+      pricingTier = var.defender_plans["Api"].tier
+      subPlan     = var.defender_plans["Api"].subplan
+    }
+  }
+}
+
+# Apply complete extension sets with PATCH semantics so existing pricing
+# singletons are updated without AzureRM replacement behavior.
+resource "azapi_update_resource" "plan_extensions" {
+  for_each = local.plan_extensions
+
+  type      = "Microsoft.Security/pricings@2024-01-01"
+  name      = each.key
+  parent_id = var.subscription_resource_id
+  body = {
+    properties = {
+      pricingTier = each.value.tier
+      extensions = [
+        for name, extension in each.value.extensions : merge(
+          {
+            name      = name
+            isEnabled = title(tostring(extension.enabled))
+          },
+          length(extension.additional_extension_properties) > 0 ? {
+            additionalExtensionProperties = extension.additional_extension_properties
+          } : {}
+        )
+      ]
+    }
+  }
+
+  depends_on = [
+    azapi_resource.ai_plan,
+    azapi_resource.api_plan,
+    azurerm_security_center_subscription_pricing.plan,
+  ]
 }
 
 # Enable Microsoft Defender for Endpoint integration at subscription scope.
@@ -89,87 +167,4 @@ resource "azurerm_security_center_contact" "security" {
 
   alert_notifications = true
   alerts_to_admins    = true
-}
-
-# Associate the protected subscription with the selected Log Analytics workspace.
-resource "azurerm_security_center_workspace" "defender" {
-  scope        = var.subscription_resource_id
-  workspace_id = var.log_analytics_workspace_id
-}
-
-# Install solutions through the LAW provider so central workspaces are supported.
-resource "azurerm_log_analytics_solution" "security" {
-  count    = var.enable_workspace_solutions ? 1 : 0
-  provider = azurerm.log_analytics
-
-  solution_name         = "Security"
-  location              = var.log_analytics_location
-  resource_group_name   = var.log_analytics_resource_group_name
-  workspace_resource_id = var.log_analytics_workspace_id
-  workspace_name        = var.log_analytics_workspace_name
-
-  plan {
-    publisher = "Microsoft"
-    product   = "OMSGallery/Security"
-  }
-}
-
-resource "azurerm_log_analytics_solution" "security_center_free" {
-  count    = var.enable_workspace_solutions ? 1 : 0
-  provider = azurerm.log_analytics
-
-  solution_name         = "SecurityCenterFree"
-  location              = var.log_analytics_location
-  resource_group_name   = var.log_analytics_resource_group_name
-  workspace_resource_id = var.log_analytics_workspace_id
-  workspace_name        = var.log_analytics_workspace_name
-
-  plan {
-    publisher = "Microsoft"
-    product   = "OMSGallery/SecurityCenterFree"
-  }
-}
-
-# Export actionable alerts and posture data to the selected workspace.
-resource "azurerm_security_center_automation" "continuous_export" {
-  count = var.enable_continuous_export ? 1 : 0
-
-  name                = "ExportToWorkspace"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-
-  action {
-    type        = "loganalytics"
-    resource_id = var.log_analytics_workspace_id
-  }
-
-  source {
-    event_source = "Alerts"
-
-    rule_set {
-      rule {
-        property_path  = "Severity"
-        operator       = "Equals"
-        expected_value = "High"
-        property_type  = "String"
-      }
-
-      rule {
-        property_path  = "Severity"
-        operator       = "Equals"
-        expected_value = "Medium"
-        property_type  = "String"
-      }
-    }
-  }
-
-  source {
-    event_source = "SecureScores"
-  }
-
-  source {
-    event_source = "SecureScoreControls"
-  }
-
-  scopes = [var.subscription_resource_id]
 }

@@ -20,52 +20,6 @@ variable "adopt_existing_resources" {
   default     = false
 }
 
-# Supporting resource placement and Log Analytics selection.
-variable "location" {
-  description = "Azure region for Defender monitoring resources."
-  type        = string
-  default     = "eastus"
-}
-
-variable "resource_group_name" {
-  description = "Resource group for Defender monitoring resources."
-  type        = string
-}
-
-variable "log_analytics_workspace_name" {
-  description = "Name of the Log Analytics workspace to create. Required when existing_log_analytics_workspace_id is null."
-  type        = string
-  default     = null
-  nullable    = true
-}
-
-variable "existing_log_analytics_workspace_id" {
-  description = "Optional resource ID of an existing Log Analytics workspace to use instead of creating one."
-  type        = string
-  default     = null
-  nullable    = true
-
-  validation {
-    condition = var.existing_log_analytics_workspace_id == null || can(regex(
-      "(?i)^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\\.OperationalInsights/workspaces/[^/]+$",
-      trimspace(var.existing_log_analytics_workspace_id)
-    ))
-    error_message = "existing_log_analytics_workspace_id must be a complete Log Analytics workspace resource ID."
-  }
-}
-
-variable "log_analytics_sku" {
-  description = "Log Analytics workspace SKU."
-  type        = string
-  default     = "PerGB2018"
-}
-
-variable "log_retention_in_days" {
-  description = "Log Analytics retention period."
-  type        = number
-  default     = 90
-}
-
 # Defender alert recipient settings.
 variable "security_contact_email" {
   description = "Email address that receives Defender for Cloud security alerts."
@@ -86,14 +40,18 @@ variable "security_contact_phone" {
 
 # Subscription-level Defender pricing configuration approved by the security team.
 variable "defender_plans" {
-  description = "Defender plans shown as On in the security team's test scope. APIs are intentionally omitted."
+  description = "Subscription-level Defender plans, subplans, and optional pricing extensions."
   type = map(object({
     tier    = optional(string, "Standard")
     subplan = optional(string)
+    extensions = optional(map(object({
+      enabled                         = bool
+      additional_extension_properties = optional(map(string), {})
+    })), {})
   }))
   default = {
     VirtualMachines = {
-      subplan = "P2"
+      subplan = "P1"
     }
     AppServices                   = {}
     SqlServers                    = {}
@@ -102,9 +60,30 @@ variable "defender_plans" {
     CosmosDbs                     = {}
     StorageAccounts = {
       subplan = "DefenderForStorageV2"
+      extensions = {
+        OnUploadMalwareScanning = { enabled = true }
+        SensitiveDataDiscovery  = { enabled = true }
+      }
     }
-    Containers = {}
-    AI         = {}
+    Containers = {
+      extensions = {
+        ContainerRegistriesVulnerabilityAssessments = { enabled = true }
+        AgentlessDiscoveryForKubernetes             = { enabled = true }
+        AgentlessVmScanning                         = { enabled = true }
+        ContainerSensor                             = { enabled = true }
+        ContainerIntegrityContribution              = { enabled = true }
+      }
+    }
+    AI = {
+      extensions = {
+        AIModelScanner             = { enabled = true }
+        AIPromptEvidence           = { enabled = true }
+        AIPromptSharingWithPurview = { enabled = true }
+      }
+    }
+    Api = {
+      subplan = "P1"
+    }
     KeyVaults = {
       subplan = "PerKeyVault"
     }
@@ -114,12 +93,14 @@ variable "defender_plans" {
   }
 
   validation {
-    condition     = !contains(keys(var.defender_plans), "Api")
-    error_message = "The security test scope requires Defender for APIs to remain Off; remove Api from defender_plans."
+    condition = alltrue([
+      for name, plan in var.defender_plans : name != "Api" || contains(["P1", "P2", "P3", "P4", "P5"], plan.subplan == null ? "" : plan.subplan)
+    ])
+    error_message = "Defender for APIs requires a subplan from P1 through P5."
   }
 }
 
-# Optional policy, endpoint, scanning, export, and workspace integrations.
+# Optional policy, endpoint, and scanning integrations.
 variable "assign_security_benchmark" {
   description = "Assign the Microsoft Cloud Security Benchmark initiative."
   type        = bool
@@ -139,25 +120,12 @@ variable "enable_mdvm" {
 }
 
 variable "enable_agentless_vm_scanning" {
-  description = "Enable agentless VM scanning."
+  description = "Enable agentless VM scanning. Requires Defender for Servers P2."
   type        = bool
-  default     = true
-}
+  default     = false
 
-variable "enable_continuous_export" {
-  description = "Export medium/high alerts, secure scores, and controls to Log Analytics."
-  type        = bool
-  default     = true
-}
-
-variable "enable_workspace_solutions" {
-  description = "Install Security and SecurityCenterFree solutions in Log Analytics."
-  type        = bool
-  default     = true
-}
-
-variable "tags" {
-  description = "Tags applied to resources created by the root module."
-  type        = map(string)
-  default     = {}
+  validation {
+    condition     = !var.enable_agentless_vm_scanning || try(var.defender_plans["VirtualMachines"].subplan, null) != "P1"
+    error_message = "Agentless VM scanning is a Defender for Servers P2 feature and must be disabled when VirtualMachines uses P1."
+  }
 }

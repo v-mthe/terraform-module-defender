@@ -1,4 +1,4 @@
-# Module-level constraints allow compatible provider updates within the tested major versions.
+# Compatible provider ranges for direct use of the Defender module.
 terraform {
   required_version = ">= 1.7.0"
 
@@ -6,10 +6,6 @@ terraform {
     azurerm = {
       source  = "hashicorp/azurerm"
       version = ">= 4.21.0, < 5.0.0"
-      # Workspace solutions may be deployed to a separate monitoring subscription.
-      configuration_aliases = [
-        azurerm.log_analytics,
-      ]
     }
     azapi = {
       source  = "Azure/azapi"
