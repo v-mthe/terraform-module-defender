@@ -1,14 +1,72 @@
-environment                  = "prod"
-subscription_id              = "00000000-0000-0000-0000-000000000000"
-adopt_existing_resources     = false
-location                     = "eastus"
-resource_group_name          = "rg-prod-defender-security"
-log_analytics_workspace_name = "law-defender-prod-01"
-# existing_log_analytics_workspace_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-shared-monitoring/providers/Microsoft.OperationalInsights/workspaces/law-shared-01"
-security_contact_email       = "security@example.com"
-security_contact_phone       = null
-assign_security_benchmark    = true
+# Production environment configuration.
+# Copy this file to prod.tfvars and replace all placeholder values.
 
+# Required: target subscription protected by Microsoft Defender for Cloud.
+subscription_id = "00000000-0000-0000-0000-000000000000"
+environment     = "prod"
+
+# Optional: set true when Defender pricing/settings already exist and must be
+# imported into this environment's Terraform state. Keep false for greenfield.
+adopt_existing_resources = false
+
+# Required: resource group created for Defender automation and, by default, LAW.
+location            = "eastus"
+resource_group_name = "rg-prod-defender-security"
+
+# Log Analytics option A (default): create a new workspace.
+# The name must be globally unique. SKU and retention are optional defaults.
+log_analytics_workspace_name = "law-defender-prod-01"
+log_analytics_sku            = "PerGB2018"
+log_retention_in_days        = 90
+
+# Log Analytics option B: use an existing workspace instead.
+# Uncomment the resource ID below. When set, the name, SKU, and retention values
+# above are ignored. Cross-subscription workspaces require read/manage access.
+# existing_log_analytics_workspace_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-shared-monitoring/providers/Microsoft.OperationalInsights/workspaces/law-shared-01"
+
+# Required: security alert recipient. Phone is optional and must use E.164 format.
+security_contact_email = "security@example.com"
+security_contact_phone = null
+# security_contact_phone = "+15551234567"
+
+# Optional Defender capabilities. These values show the module defaults.
+# Disable the benchmark when the deployment identity cannot assign Azure Policy.
+assign_security_benchmark    = true
+enable_mde_integration       = true
+enable_mdvm                  = true
+enable_agentless_vm_scanning = true
+enable_continuous_export     = true
+
+# Set false when a central platform team manages Security and SecurityCenterFree
+# solutions on the selected Log Analytics workspace.
+enable_workspace_solutions = true
+
+# Optional: approved Defender plans. Remove an entry to leave it unmanaged.
+# Defender for APIs must remain omitted. The tier defaults to Standard.
+defender_plans = {
+  VirtualMachines = {
+    subplan = "P2"
+  }
+  AppServices                   = {}
+  SqlServers                    = {}
+  SqlServerVirtualMachines      = {}
+  OpenSourceRelationalDatabases = {}
+  CosmosDbs                     = {}
+  StorageAccounts = {
+    subplan = "DefenderForStorageV2"
+  }
+  Containers = {}
+  AI         = {}
+  KeyVaults = {
+    subplan = "PerKeyVault"
+  }
+  Arm = {
+    subplan = "PerSubscription"
+  }
+}
+
+# Optional: tags merged with Environment and ManagedBy by the root configuration.
+# Add all tags required by customer Azure Policy.
 tags = {
   Workload   = "DefenderForCloud"
   CostCenter = "CHANGE_ME"
