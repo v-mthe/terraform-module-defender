@@ -1,9 +1,11 @@
+# Resolve the protected subscription and select either a new or existing LAW.
 locals {
   tags = merge(var.tags, {
     Environment = var.environment
     ManagedBy   = "Terraform"
   })
 
+  # Capture subscription, resource group, and workspace name from a validated Azure resource ID.
   existing_log_analytics_workspace_parts = var.existing_log_analytics_workspace_id == null ? [] : regex(
     "(?i)^/subscriptions/([^/]+)/resourceGroups/([^/]+)/providers/Microsoft\\.OperationalInsights/workspaces/([^/]+)$",
     trimspace(var.existing_log_analytics_workspace_id)
@@ -13,6 +15,7 @@ locals {
 
 data "azurerm_subscription" "current" {}
 
+# The aliased provider allows an existing LAW to reside in a central subscription.
 data "azurerm_log_analytics_workspace" "existing" {
   count    = var.existing_log_analytics_workspace_id == null ? 0 : 1
   provider = azurerm.log_analytics
@@ -27,6 +30,7 @@ resource "azurerm_resource_group" "defender" {
   tags     = local.tags
 }
 
+# Create a LAW only when the customer has not supplied an existing workspace ID.
 resource "azurerm_log_analytics_workspace" "defender" {
   count = var.existing_log_analytics_workspace_id == null ? 1 : 0
 
@@ -45,6 +49,7 @@ resource "azurerm_log_analytics_workspace" "defender" {
   }
 }
 
+# Normalize both LAW paths into one interface consumed by the Defender module.
 locals {
   log_analytics_workspace_id = var.existing_log_analytics_workspace_id == null ? (
     azurerm_log_analytics_workspace.defender[0].id
@@ -71,6 +76,7 @@ locals {
 module "defender_for_cloud" {
   source = "./modules/defender_for_cloud"
 
+  # Workspace solutions use the LAW provider; subscription security resources use the default.
   providers = {
     azurerm               = azurerm
     azurerm.log_analytics = azurerm.log_analytics

@@ -1,3 +1,4 @@
+# Combine AzureRM and AzAPI pricing resources behind one module output.
 output "defender_plan_ids" {
   description = "Resource IDs of the enabled Defender plans."
   value = merge(

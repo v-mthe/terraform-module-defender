@@ -1,3 +1,4 @@
+# Target subscription and environment controls.
 variable "subscription_id" {
   description = "Azure subscription ID where Defender for Cloud will be configured."
   type        = string
@@ -19,6 +20,7 @@ variable "adopt_existing_resources" {
   default     = false
 }
 
+# Supporting resource placement and Log Analytics selection.
 variable "location" {
   description = "Azure region for Defender monitoring resources."
   type        = string
@@ -64,6 +66,7 @@ variable "log_retention_in_days" {
   default     = 90
 }
 
+# Defender alert recipient settings.
 variable "security_contact_email" {
   description = "Email address that receives Defender for Cloud security alerts."
   type        = string
@@ -81,6 +84,7 @@ variable "security_contact_phone" {
   nullable    = true
 }
 
+# Subscription-level Defender pricing configuration approved by the security team.
 variable "defender_plans" {
   description = "Defender plans shown as On in the security team's test scope. APIs are intentionally omitted."
   type = map(object({
@@ -115,6 +119,7 @@ variable "defender_plans" {
   }
 }
 
+# Optional policy, endpoint, scanning, export, and workspace integrations.
 variable "assign_security_benchmark" {
   description = "Assign the Microsoft Cloud Security Benchmark initiative."
   type        = bool

@@ -1,3 +1,4 @@
+# Provider and state requirements for the reusable root configuration.
 terraform {
   required_version = ">= 1.7.0"
 
@@ -12,9 +13,11 @@ terraform {
     }
   }
 
+  # Backend coordinates and the environment-specific key are supplied at init time.
   backend "azurerm" {}
 }
 
+# Default provider targets the subscription protected by Defender for Cloud.
 provider "azurerm" {
   features {}
 
@@ -22,6 +25,7 @@ provider "azurerm" {
   resource_provider_registrations = "none"
 }
 
+# This alias can target a central monitoring subscription that owns an existing LAW.
 provider "azurerm" {
   alias = "log_analytics"
 

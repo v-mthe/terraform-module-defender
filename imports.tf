@@ -1,3 +1,4 @@
+# Declarative imports are opt-in so greenfield deployments do not assume resources exist.
 locals {
   azurerm_defender_plan_imports = var.adopt_existing_resources ? {
     for name, plan in var.defender_plans : name => plan if name != "AI"
@@ -10,6 +11,7 @@ locals {
   } : {}
 }
 
+# AzureRM-supported Defender pricing plans use their pricing resource names as IDs.
 import {
   for_each = local.azurerm_defender_plan_imports
 
@@ -17,6 +19,7 @@ import {
   id = "${data.azurerm_subscription.current.id}/providers/Microsoft.Security/pricings/${each.key}"
 }
 
+# Defender for AI is imported separately because it is managed through AzAPI.
 import {
   for_each = local.ai_plan_import
 
@@ -24,6 +27,7 @@ import {
   id = "${data.azurerm_subscription.current.id}/providers/Microsoft.Security/pricings/${each.value}"
 }
 
+# Adopt singleton subscription settings only when their matching feature is enabled.
 import {
   for_each = local.mde_import
 

@@ -1,3 +1,4 @@
+# Root outputs expose the resources most commonly consumed by pipelines and other stacks.
 output "defender_plan_ids" {
   description = "Resource IDs of the enabled Defender plans."
   value       = module.defender_for_cloud.defender_plan_ids

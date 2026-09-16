@@ -1,3 +1,4 @@
+# Inputs keep subscription security resources separate from LAW-owned resources.
 variable "subscription_resource_id" {
   description = "Azure subscription resource ID to protect."
   type        = string
@@ -33,6 +34,7 @@ variable "log_analytics_resource_group_name" {
   type        = string
 }
 
+# Defender security contact and pricing inputs.
 variable "security_contact_email" {
   description = "Email address that receives Defender security alerts."
   type        = string
@@ -53,6 +55,7 @@ variable "defender_plans" {
   }))
 }
 
+# Optional Defender platform capabilities.
 variable "assign_security_benchmark" {
   description = "Assign the Microsoft Cloud Security Benchmark initiative."
   type        = bool
