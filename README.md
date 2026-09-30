@@ -8,6 +8,7 @@ See [DEPLOYMENT-INSTRUCTION-SET.md](DEPLOYMENT-INSTRUCTION-SET.md) for the compl
 
 | Portal plan | Terraform pricing name | Selection |
 |---|---|---|
+| Defender CSPM | `CloudPosture` | On |
 | Servers | `VirtualMachines` / P1 | On |
 | App Service | `AppServices` | On |
 | Databases | `SqlServers`, `SqlServerVirtualMachines`, `OpenSourceRelationalDatabases`, `CosmosDbs` | On (4/4) |
@@ -78,6 +79,6 @@ terraform init -migrate-state -backend-config='environments/backend/dev.backend.
 
 The lab identity cannot create subscription policy assignments, so `dev.tfvars` disables the Microsoft Cloud Security Benchmark assignment. Staging and production retain the secure default and require `Microsoft.Authorization/policyAssignments/write`.
 
-The deployment identity needs permissions for subscription pricing and settings plus policy assignments when enabled. Register `Microsoft.Security` and `Microsoft.PolicyInsights` in the target subscription before deployment.
+The deployment identity must have `Microsoft.Security/pricings/write` at subscription scope to enable CSPM, AI Services, APIs, and the other paid plans. It also needs permissions for Defender settings and policy assignments when enabled. Register `Microsoft.Security` and `Microsoft.PolicyInsights` in the target subscription before deployment. If the portal reports insufficient permissions or CSPM, AI, or API remains Off after apply, treat the deployment as incomplete and review the Terraform apply output and deployment identity role assignments.
 
 Reference: [Deploy Microsoft Defender for Cloud via Terraform](https://techcommunity.microsoft.com/blog/microsoftdefendercloudblog/deploy-microsoft-defender-for-cloud-via-terraform/3563710)

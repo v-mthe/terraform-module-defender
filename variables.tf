@@ -58,6 +58,7 @@ variable "defender_plans" {
     SqlServerVirtualMachines      = {}
     OpenSourceRelationalDatabases = {}
     CosmosDbs                     = {}
+    CloudPosture                  = {}
     StorageAccounts = {
       subplan = "DefenderForStorageV2"
       extensions = {

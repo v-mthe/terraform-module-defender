@@ -24,6 +24,8 @@ run "configure_subscription_plans" {
           SensitiveDataDiscovery  = { enabled = true }
         }
       }
+      CloudPosture = {}
+      AI           = {}
       Api = {
         subplan = "P1"
       }
@@ -40,6 +42,15 @@ run "configure_subscription_plans" {
   assert {
     condition     = var.defender_plans["Api"].tier == "Standard" && var.defender_plans["Api"].subplan == "P1"
     error_message = "Defender for APIs must use Standard tier with the requested P1 subplan."
+  }
+
+  assert {
+    condition = (
+      alltrue([for name in ["CloudPosture", "AI", "Api"] : contains(module.defender_for_cloud.defender_plan_names, name)]) &&
+      alltrue([for name in ["CloudPosture", "AI", "Api"] : var.defender_plans[name].tier == "Standard"]) &&
+      var.defender_plans["Api"].subplan == "P1"
+    )
+    error_message = "Defender CSPM, AI, and APIs must all be configured at Standard tier through their supported provider paths."
   }
 
   assert {

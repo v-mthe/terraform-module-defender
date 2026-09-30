@@ -12,6 +12,7 @@ The following plans are configured at `Standard` tier and can generate Azure cha
 
 | Defender plan | Terraform pricing name | Subplan |
 |---|---|---|
+| Defender CSPM | `CloudPosture` | Default |
 | Servers | `VirtualMachines` | `P1` |
 | App Service | `AppServices` | Default |
 | SQL databases | `SqlServers` | Default |
@@ -37,7 +38,7 @@ Storage malware scanning and sensitive-data discovery are enabled. All supported
 - Required resource providers registered:
   - `Microsoft.Security`
   - `Microsoft.PolicyInsights`
-- Deployment identity permissions for Microsoft.Security settings and Defender pricing.
+- Deployment identity permission `Microsoft.Security/pricings/write` at subscription scope, plus permissions for the configured Microsoft.Security settings.
 - `Microsoft.Authorization/policyAssignments/write` for staging and production when the Microsoft Cloud Security Benchmark assignment is enabled.
 - Required organizational tags identified before deployment.
 
@@ -153,6 +154,8 @@ Confirm all of the following before approval:
 
 - The plan targets the expected subscription.
 - There are no unexpected deletes or replacements.
+- Defender CSPM (`CloudPosture`) uses `Standard` tier.
+- Defender for AI (`AI`) uses `Standard` tier.
 - Defender for APIs uses `Standard` tier and `P1`.
 - Required Defender plans use `Standard` tier.
 - Servers use `P1` and standalone agentless VM scanning is disabled.
@@ -199,7 +202,7 @@ Verify Defender pricing:
 
 ```powershell
 az security pricing list --subscription '<target-subscription-id>' `
-  --query "value[?name=='VirtualMachines' || name=='AppServices' || name=='SqlServers' || name=='SqlServerVirtualMachines' || name=='OpenSourceRelationalDatabases' || name=='CosmosDbs' || name=='StorageAccounts' || name=='Containers' || name=='AI' || name=='Api' || name=='KeyVaults' || name=='Arm'].{plan:name,tier:pricingTier,subPlan:subPlan,coverage:resourcesCoverageStatus}" `
+  --query "value[?name=='CloudPosture' || name=='VirtualMachines' || name=='AppServices' || name=='SqlServers' || name=='SqlServerVirtualMachines' || name=='OpenSourceRelationalDatabases' || name=='CosmosDbs' || name=='StorageAccounts' || name=='Containers' || name=='AI' || name=='Api' || name=='KeyVaults' || name=='Arm'].{plan:name,tier:pricingTier,subPlan:subPlan,coverage:resourcesCoverageStatus}" `
   --output table
 ```
 
@@ -218,9 +221,10 @@ In the Azure portal:
 2. Select **Environment settings**.
 3. Select the target subscription.
 4. Confirm the plans match the approved plan table.
-5. Confirm Defender for APIs uses P1.
-6. Confirm Storage, Containers, and AI Services show fully enabled plan extensions.
-7. Review recommendations and coverage after Defender finishes onboarding resources.
+5. Confirm Defender CSPM and AI Services are On.
+6. Confirm Defender for APIs is On and uses P1.
+7. Confirm Storage, Containers, and AI Services show fully enabled plan extensions.
+8. Review recommendations and coverage after Defender finishes onboarding resources.
 
 ## 11. Promotion Process
 
@@ -270,7 +274,7 @@ The dev lab deployment was validated in a dedicated test subscription.
 
 - Log Analytics workspace, solutions, continuous export, workspace association, and their resource group were removed.
 - Post-apply Terraform plan: `No changes`.
-- All 12 approved Defender plans reported `Standard`; APIs use P1 and Servers use P1.
+- All 13 approved Defender plans reported `Standard`; APIs use P1 and Servers use P1.
 - Storage, Containers, and AI Services reported `FullyCovered` after extension enablement.
 - MDE integration reported enabled.
 - MDVM provider reported `MdeTvm`.
