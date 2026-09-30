@@ -13,7 +13,7 @@ The following plans are configured at `Standard` tier and can generate Azure cha
 | Defender plan | Terraform pricing name | Subplan |
 |---|---|---|
 | Defender CSPM | `CloudPosture` | Default |
-| Servers | `VirtualMachines` | `P1` |
+| Servers | `VirtualMachines` | Customer-selected `P1` or `P2`; P1 default |
 | App Service | `AppServices` | Default |
 | SQL databases | `SqlServers` | Default |
 | SQL servers on machines | `SqlServerVirtualMachines` | Default |
@@ -26,7 +26,7 @@ The following plans are configured at `Standard` tier and can generate Azure cha
 | Resource Manager | `Arm` | `PerSubscription` |
 | APIs | `Api` | `P1` |
 
-Storage malware scanning and sensitive-data discovery are enabled. All supported Containers and AI Services extensions are enabled. Agentless VM scanning is disabled because it requires Servers P2.
+Storage malware scanning and sensitive-data discovery are enabled. All supported Containers and AI Services extensions are enabled. Servers agentless VM scanning is disabled with P1 and may be enabled only when P2 is selected.
 
 ## 3. Prerequisites
 
@@ -141,11 +141,18 @@ terraform state list | Select-String 'log_analytics|security_center_workspace|se
 
 Use `terraform state rm <address>` only for a LAW or resource group that is approved to remain in Azure but no longer be managed by this state. Do not remove the old integration addresses from state merely to hide their deletion; they must be removed from Azure when the customer requires no LAW integration. Never approve deletion of a shared LAW or resource group.
 
-Before downgrading an existing Servers P2 subscription to P1, disable the `AgentlessVmScanning` extension. Azure rejects P1 while this P2-only extension remains enabled.
+Select and verify the Servers configuration before planning:
+
+- P1 requires `VirtualMachines.subplan = "P1"`, `enable_agentless_vm_scanning = false`, and no Servers `AgentlessVmScanning` pricing extension.
+- P2 may use agentless scanning by setting `VirtualMachines.subplan = "P2"`, `enable_agentless_vm_scanning = true`, and enabling the Servers `AgentlessVmScanning` extension as shown in the README.
+- The Containers `AgentlessVmScanning` extension is independent from the Servers feature.
+
+Before downgrading an existing Servers P2 subscription to P1, use the Azure CLI prerequisite documented in the README to disable the Servers `AgentlessVmScanning` extension. Azure rejects P1 while this P2-only extension remains enabled.
 
 ```powershell
 terraform fmt -check -recursive
 terraform validate
+terraform test
 terraform plan -input=false -var-file=$tfvars -out="$environment.tfplan"
 terraform show -no-color "$environment.tfplan"
 ```
@@ -158,7 +165,8 @@ Confirm all of the following before approval:
 - Defender for AI (`AI`) uses `Standard` tier.
 - Defender for APIs uses `Standard` tier and `P1`.
 - Required Defender plans use `Standard` tier.
-- Servers use `P1` and standalone agentless VM scanning is disabled.
+- Servers use the customer-approved `P1` or `P2` subplan.
+- Servers agentless VM scanning is disabled for P1; when P2 scanning is selected, both its pricing extension and scanner setting are enabled.
 - Storage uses `DefenderForStorageV2`.
 - Storage, Containers, and AI Services extensions are enabled.
 - Key Vault uses `PerKeyVault`.

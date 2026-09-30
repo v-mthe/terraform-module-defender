@@ -27,6 +27,22 @@ variable "defender_plans" {
       additional_extension_properties = optional(map(string), {})
     })), {})
   }))
+
+  validation {
+    condition = (
+      !contains(keys(var.defender_plans), "VirtualMachines") ||
+      contains(["P1", "P2"], try(var.defender_plans["VirtualMachines"].subplan, ""))
+    )
+    error_message = "Defender for Servers requires VirtualMachines subplan P1 or P2."
+  }
+
+  validation {
+    condition = (
+      !try(var.defender_plans["VirtualMachines"].extensions["AgentlessVmScanning"].enabled, false) ||
+      try(var.defender_plans["VirtualMachines"].subplan, null) == "P2"
+    )
+    error_message = "The VirtualMachines AgentlessVmScanning pricing extension requires Servers P2."
+  }
 }
 
 variable "adopt_existing_resources" {
@@ -60,7 +76,7 @@ variable "enable_agentless_vm_scanning" {
   default     = false
 
   validation {
-    condition     = !var.enable_agentless_vm_scanning || try(var.defender_plans["VirtualMachines"].subplan, null) != "P1"
-    error_message = "Agentless VM scanning is a Defender for Servers P2 feature and must be disabled when VirtualMachines uses P1."
+    condition     = !var.enable_agentless_vm_scanning || try(var.defender_plans["VirtualMachines"].subplan, null) == "P2"
+    error_message = "enable_agentless_vm_scanning can be true only when VirtualMachines uses Servers P2."
   }
 }

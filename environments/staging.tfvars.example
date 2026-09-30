@@ -13,9 +13,12 @@ security_contact_phone = null
 assign_security_benchmark    = true
 enable_mde_integration       = true
 enable_mdvm                  = true
+# Servers P1 default. For P2, use the README P2 block and set this to true.
 enable_agentless_vm_scanning = false
 
 defender_plans = {
+  # P1 is the lower-cost default. Replace this block with the README P2 block
+  # when the customer approves P2 and its agentless scanning capability.
   VirtualMachines = {
     subplan = "P1"
   }

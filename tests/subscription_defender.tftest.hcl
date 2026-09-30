@@ -108,6 +108,110 @@ run "adopt_existing_subscription_plans" {
   }
 }
 
+run "configure_servers_p2_with_agentless_scanning" {
+  command = plan
+
+  variables {
+    subscription_id              = "00000000-0000-0000-0000-000000000000"
+    environment                  = "dev"
+    security_contact_email       = "security@example.com"
+    assign_security_benchmark    = false
+    enable_mde_integration       = false
+    enable_mdvm                  = false
+    enable_agentless_vm_scanning = true
+    defender_plans = {
+      VirtualMachines = {
+        subplan = "P2"
+        extensions = {
+          AgentlessVmScanning = {
+            enabled = true
+            additional_extension_properties = {
+              ExclusionTags = "[]"
+            }
+          }
+        }
+      }
+    }
+  }
+
+  override_data {
+    target = data.azurerm_subscription.current
+    values = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000"
+    }
+  }
+
+  assert {
+    condition = (
+      var.defender_plans["VirtualMachines"].subplan == "P2" &&
+      var.enable_agentless_vm_scanning &&
+      var.defender_plans["VirtualMachines"].extensions["AgentlessVmScanning"].enabled
+    )
+    error_message = "Servers P2 must allow agentless VM scanning in both the pricing extension and scanner setting."
+  }
+}
+
+run "reject_servers_p1_agentless_extension" {
+  command = plan
+
+  variables {
+    subscription_id              = "00000000-0000-0000-0000-000000000000"
+    environment                  = "dev"
+    security_contact_email       = "security@example.com"
+    assign_security_benchmark    = false
+    enable_mde_integration       = false
+    enable_mdvm                  = false
+    enable_agentless_vm_scanning = false
+    defender_plans = {
+      VirtualMachines = {
+        subplan = "P1"
+        extensions = {
+          AgentlessVmScanning = {
+            enabled = true
+          }
+        }
+      }
+    }
+  }
+
+  override_data {
+    target = data.azurerm_subscription.current
+    values = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000"
+    }
+  }
+
+  expect_failures = [var.defender_plans]
+}
+
+run "reject_servers_p1_scanner_setting" {
+  command = plan
+
+  variables {
+    subscription_id              = "00000000-0000-0000-0000-000000000000"
+    environment                  = "dev"
+    security_contact_email       = "security@example.com"
+    assign_security_benchmark    = false
+    enable_mde_integration       = false
+    enable_mdvm                  = false
+    enable_agentless_vm_scanning = true
+    defender_plans = {
+      VirtualMachines = {
+        subplan = "P1"
+      }
+    }
+  }
+
+  override_data {
+    target = data.azurerm_subscription.current
+    values = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000"
+    }
+  }
+
+  expect_failures = [var.enable_agentless_vm_scanning]
+}
+
 run "reject_api_without_paid_subplan" {
   command = plan
 
