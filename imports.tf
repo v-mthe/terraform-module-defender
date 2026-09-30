@@ -7,6 +7,9 @@ locals {
   api_plan_import = var.adopt_existing_resources && contains(keys(var.defender_plans), "Api") ? { Api = "Api" } : {}
   mde_import      = var.adopt_existing_resources && var.enable_mde_integration ? { WDATP = "WDATP" } : {}
   mdvm_import     = var.adopt_existing_resources && var.enable_mdvm ? { default = "AzureServersSetting" } : {}
+  security_contact_import = var.adopt_existing_resources ? {
+    default = "default"
+  } : {}
   vm_scanner_import = var.adopt_existing_resources && var.enable_agentless_vm_scanning ? {
     default = "default"
   } : {}
@@ -49,6 +52,14 @@ import {
 
   to = module.defender_for_cloud.azapi_resource.agentless_vm_scanning[0]
   id = "${data.azurerm_subscription.current.id}/providers/Microsoft.Security/vmScanners/${each.value}?api-version=2022-03-01-preview"
+}
+
+# Adopt the existing default security contact in brownfield subscriptions.
+import {
+  for_each = local.security_contact_import
+
+  to = module.defender_for_cloud.azurerm_security_center_contact.security
+  id = "${data.azurerm_subscription.current.id}/providers/Microsoft.Security/securityContacts/${each.value}"
 }
 
 # Defender for APIs is also managed through AzAPI.

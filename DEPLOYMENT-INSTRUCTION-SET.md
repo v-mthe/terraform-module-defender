@@ -121,7 +121,7 @@ Select the import mode in the environment tfvars before planning:
 | A LAW exists | Depends only on Defender resource state | The LAW is not imported or managed |
 | State is unknown | Start with `false` | Plan first and switch to `true` only after an existing-resource response |
 
-Brownfield mode imports the configured AzureRM pricing plans, AI and API pricing, MDE, MDVM, and agentless VM scanning when enabled. An import changes Terraform state ownership; it does not recreate the Azure resource. Never manage the same Defender resource from multiple Terraform states.
+Brownfield mode imports the configured AzureRM pricing plans, AI and API pricing, MDE, MDVM, the default security contact, and agentless VM scanning when enabled. An import changes Terraform state ownership; it does not recreate the Azure resource. Never manage the same Defender resource from multiple Terraform states.
 
 ### Existing LAW or LAW-Enabled State
 

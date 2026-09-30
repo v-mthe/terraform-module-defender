@@ -94,9 +94,17 @@ run "adopt_existing_subscription_plans" {
     target = module.defender_for_cloud.azapi_resource.api_plan[0]
   }
 
+  override_resource {
+    target = module.defender_for_cloud.azurerm_security_center_contact.security
+  }
+
   assert {
-    condition     = length(local.azurerm_defender_plan_imports) == 1 && length(local.api_plan_import) == 1
-    error_message = "Brownfield mode must import both AzureRM and API pricing resources."
+    condition = (
+      length(local.azurerm_defender_plan_imports) == 1 &&
+      length(local.api_plan_import) == 1 &&
+      length(local.security_contact_import) == 1
+    )
+    error_message = "Brownfield mode must import AzureRM pricing, API pricing, and the existing security contact."
   }
 }
 
